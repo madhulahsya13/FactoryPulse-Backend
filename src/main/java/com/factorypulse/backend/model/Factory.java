@@ -1,5 +1,6 @@
 package com.factorypulse.backend.model;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.persistence.*;
 
 @Entity
@@ -16,6 +17,12 @@ public class Factory {
     private String location;
 
     private String industryType;
+
+    // Factory owner. Set by the server only, never read from the request body.
+    @ManyToOne
+    @JoinColumn(name = "owner_id")
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY)
+    private User owner;
 
     public Factory() {
     }
@@ -56,5 +63,13 @@ public class Factory {
 
     public void setIndustryType(String industryType) {
         this.industryType = industryType;
+    }
+
+    public User getOwner() {
+        return owner;
+    }
+
+    public void setOwner(User owner) {
+        this.owner = owner;
     }
 }

@@ -3,6 +3,7 @@ package com.factorypulse.backend.controller;
 import com.factorypulse.backend.dto.LoginRequest;
 import com.factorypulse.backend.dto.LoginResponse;
 import com.factorypulse.backend.model.User;
+import com.factorypulse.backend.service.AccessService;
 import com.factorypulse.backend.service.JwtService;
 import com.factorypulse.backend.service.UserService;
 import org.springframework.http.ResponseEntity;
@@ -28,7 +29,8 @@ public class AuthController {
     @PostMapping("/login")
     public ResponseEntity<?> login(@RequestBody LoginRequest request) {
 
-        User user = userService.findByEmail(request.getEmail())
+        User user = userService.findByEmail(
+                request.getEmail() == null ? "" : request.getEmail().trim())
                 .orElse(null);
 
         if (user == null) {
@@ -44,13 +46,17 @@ public class AuthController {
                     .body("Invalid email or password");
         }
 
-        String token = jwtService.generateToken(user.getEmail());
+        String role = AccessService.isAdminRole(user.getRole())
+                ? UserService.ROLE_ADMIN
+                : UserService.ROLE_OWNER;
+
+        String token = jwtService.generateToken(user.getEmail(), role);
 
         LoginResponse response = new LoginResponse(
                 token,
                 user.getName(),
                 user.getEmail(),
-                user.getRole()
+                role
         );
 
         return ResponseEntity.ok(response);

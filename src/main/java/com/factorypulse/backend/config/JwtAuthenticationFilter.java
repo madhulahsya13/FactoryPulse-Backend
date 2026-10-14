@@ -1,6 +1,7 @@
 package com.factorypulse.backend.config;
 
 import com.factorypulse.backend.model.User;
+import com.factorypulse.backend.service.AccessService;
 import com.factorypulse.backend.service.UserService;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
@@ -10,6 +11,7 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
@@ -17,7 +19,7 @@ import org.springframework.web.filter.OncePerRequestFilter;
 import javax.crypto.SecretKey;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
-import java.util.Collections;
+import java.util.List;
 
 @Component
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
@@ -66,18 +68,29 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                     .getPayload();
 
             String email = claims.getSubject();
+            String role = claims.get("role", String.class);
 
-            User user = userService.findByEmail(email).orElse(null);
+            if (role == null) {
+                // Old token without role claim: look the user up once.
+                User user = userService.findByEmail(email).orElse(null);
+                if (user == null) {
+                    filterChain.doFilter(request, response);
+                    return;
+                }
+                email = user.getEmail();
+                role = user.getRole();
+            }
 
-            if (user != null
-                    && SecurityContextHolder.getContext()
-                    .getAuthentication() == null) {
+            if (SecurityContextHolder.getContext().getAuthentication() == null) {
+
+                String authority = AccessService.isAdminRole(role)
+                        ? "ROLE_ADMIN" : "ROLE_FACTORY_OWNER";
 
                 UsernamePasswordAuthenticationToken authentication =
                         new UsernamePasswordAuthenticationToken(
-                                user.getEmail(),
+                                email,
                                 null,
-                                Collections.emptyList()
+                                List.of(new SimpleGrantedAuthority(authority))
                         );
 
                 SecurityContextHolder.getContext()

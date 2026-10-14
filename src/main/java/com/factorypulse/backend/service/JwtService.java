@@ -13,7 +13,7 @@ public class JwtService {
 
     private final String secretKey = System.getenv("JWT_SECRET");
 
-    public String generateToken(String email) {
+    public String generateToken(String email, String role) {
 
         if (secretKey == null || secretKey.length() < 32) {
             throw new IllegalStateException(
@@ -27,6 +27,7 @@ public class JwtService {
 
         return Jwts.builder()
                 .subject(email)
+                .claim("role", role)
                 .issuedAt(new Date())
                 .expiration(new Date(System.currentTimeMillis() + 1000 * 60 * 60))
                 .signWith(key)

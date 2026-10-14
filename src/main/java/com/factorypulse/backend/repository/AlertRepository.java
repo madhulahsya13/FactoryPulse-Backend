@@ -10,4 +10,9 @@ public interface AlertRepository extends JpaRepository<Alert, Long> {
     List<Alert> findByMachineId(Long machineId);
 
     List<Alert> findByResolved(Boolean resolved);
+
+    List<Alert> findByMachineProductionLineFactoryOwnerEmail(String email);
+
+    List<Alert> findByResolvedAndMachineProductionLineFactoryOwnerEmail(
+            Boolean resolved, String email);
 }

@@ -17,20 +17,28 @@ public class DashboardService {
     private final MachineRepository machineRepository;
     private final AlertRepository alertRepository;
     private final SensorReadingRepository sensorReadingRepository;
+    private final AccessService accessService;
 
     public DashboardService(
             MachineRepository machineRepository,
             AlertRepository alertRepository,
-            SensorReadingRepository sensorReadingRepository) {
+            SensorReadingRepository sensorReadingRepository,
+            AccessService accessService) {
 
         this.machineRepository = machineRepository;
         this.alertRepository = alertRepository;
         this.sensorReadingRepository = sensorReadingRepository;
+        this.accessService = accessService;
     }
 
     public Map<String, Object> getDashboardSummary() {
 
-        List<Machine> machines = machineRepository.findAll();
+        // null = ADMIN (everything). Otherwise only this owner's data.
+        String email = accessService.ownerFilterEmail();
+
+        List<Machine> machines = email == null
+                ? machineRepository.findAll()
+                : machineRepository.findByProductionLineFactoryOwnerEmail(email);
 
         long totalMachines = machines.size();
 
@@ -44,18 +52,17 @@ public class DashboardService {
                         "STOPPED".equalsIgnoreCase(machine.getStatus()))
                 .count();
 
-        long activeAlerts =
-                alertRepository.findByResolved(false).size();
+        long activeAlerts = email == null
+                ? alertRepository.findByResolved(false).size()
+                : alertRepository
+                .findByResolvedAndMachineProductionLineFactoryOwnerEmail(false, email)
+                .size();
 
-        List<SensorReading> sensorReadings =
-                sensorReadingRepository.findAll();
-
-        SensorReading latestReading = null;
-
-        if (!sensorReadings.isEmpty()) {
-            latestReading =
-                    sensorReadings.get(sensorReadings.size() - 1);
-        }
+        SensorReading latestReading = (email == null
+                ? sensorReadingRepository.findFirstByOrderByTimestampDesc()
+                : sensorReadingRepository
+                .findFirstByMachineProductionLineFactoryOwnerEmailOrderByTimestampDesc(email))
+                .orElse(null);
 
         Map<String, Object> dashboard = new HashMap<>();
 

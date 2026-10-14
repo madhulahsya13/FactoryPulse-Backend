@@ -10,4 +10,4 @@ RUN ./mvnw clean package -DskipTests
 
 EXPOSE 8080
 
-CMD ["sh", "-c", "java -jar target/*.jar --server.port=${PORT:-8080}"]
+CMD ["sh", "-c", "java -XX:+UseSerialGC -XX:MaxRAMPercentage=75 -XX:TieredStopAtLevel=1 -jar target/*.jar --server.port=${PORT:-8080}"]

@@ -11,24 +11,36 @@ import java.util.Optional;
 public class FactoryService {
 
     private final FactoryRepository factoryRepository;
+    private final AccessService accessService;
 
-    public FactoryService(FactoryRepository factoryRepository) {
+    public FactoryService(FactoryRepository factoryRepository,
+                          AccessService accessService) {
         this.factoryRepository = factoryRepository;
+        this.accessService = accessService;
     }
 
     public Factory createFactory(Factory factory) {
+        factory.setId(null);
+        factory.setOwner(accessService.currentUser());
         return factoryRepository.save(factory);
     }
 
     public List<Factory> getAllFactories() {
-        return factoryRepository.findAll();
+        String email = accessService.ownerFilterEmail();
+        return email == null
+                ? factoryRepository.findAll()
+                : factoryRepository.findByOwnerEmail(email);
     }
 
     public Optional<Factory> getFactoryById(Long id) {
-        return factoryRepository.findById(id);
+        return factoryRepository.findById(id)
+                .filter(f -> accessService.canAccessFactory(f));
     }
 
     public void deleteFactory(Long id) {
-        factoryRepository.deleteById(id);
+        factoryRepository.findById(id).ifPresent(factory -> {
+            accessService.require(accessService.canAccessFactory(factory));
+            factoryRepository.delete(factory);
+        });
     }
 }

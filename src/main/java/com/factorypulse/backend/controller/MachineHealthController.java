@@ -3,6 +3,7 @@ package com.factorypulse.backend.controller;
 
 import com.factorypulse.backend.model.SensorReading;
 import com.factorypulse.backend.repository.SensorReadingRepository;
+import com.factorypulse.backend.service.AccessService;
 import com.factorypulse.backend.service.MachineHealthService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -17,10 +18,13 @@ public class MachineHealthController {
 
     private final SensorReadingRepository sensorReadingRepository;
     private final MachineHealthService machineHealthService;
+    private final AccessService accessService;
 
     public MachineHealthController(
             SensorReadingRepository sensorReadingRepository,
-            MachineHealthService machineHealthService) {
+            MachineHealthService machineHealthService,
+            AccessService accessService) {
+        this.accessService = accessService;
         this.sensorReadingRepository = sensorReadingRepository;
         this.machineHealthService = machineHealthService;
     }
@@ -28,8 +32,12 @@ public class MachineHealthController {
     @GetMapping
     public ResponseEntity<List<Map<String, Object>>> getAllMachineHealth() {
 
-        List<SensorReading> readings =
-                sensorReadingRepository.findAllByOrderByTimestampDesc();
+        String email = accessService.ownerFilterEmail();
+
+        List<SensorReading> readings = email == null
+                ? sensorReadingRepository.findAllByOrderByTimestampDesc()
+                : sensorReadingRepository
+                .findByMachineProductionLineFactoryOwnerEmailOrderByTimestampDesc(email);
 
         Map<Long, Map<String, Object>> machineHealth = new LinkedHashMap<>();
 
@@ -84,6 +92,9 @@ public class MachineHealthController {
         }
 
         SensorReading reading = readings.get(0);
+
+        accessService.require(
+                accessService.canAccessMachine(reading.getMachine()));
 
         int score =
                 machineHealthService.calculateHealthScore(reading);

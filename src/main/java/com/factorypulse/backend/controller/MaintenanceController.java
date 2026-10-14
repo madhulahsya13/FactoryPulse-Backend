@@ -5,6 +5,7 @@ import com.factorypulse.backend.model.Machine;
 import com.factorypulse.backend.model.Maintenance;
 import com.factorypulse.backend.repository.MachineRepository;
 import com.factorypulse.backend.repository.MaintenanceRepository;
+import com.factorypulse.backend.service.AccessService;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
@@ -17,17 +18,24 @@ public class MaintenanceController {
 
     private final MaintenanceRepository maintenanceRepository;
     private final MachineRepository machineRepository;
+    private final AccessService accessService;
 
     public MaintenanceController(
             MaintenanceRepository maintenanceRepository,
-            MachineRepository machineRepository) {
+            MachineRepository machineRepository,
+            AccessService accessService) {
+        this.accessService = accessService;
         this.maintenanceRepository = maintenanceRepository;
         this.machineRepository = machineRepository;
     }
 
     @GetMapping
     public List<Maintenance> getAllMaintenance() {
-        return maintenanceRepository.findAll();
+        String email = accessService.ownerFilterEmail();
+        return email == null
+                ? maintenanceRepository.findAll()
+                : maintenanceRepository
+                .findByMachineProductionLineFactoryOwnerEmail(email);
     }
 
     @PostMapping
@@ -38,6 +46,8 @@ public class MaintenanceController {
         Machine machine = machineRepository.findById(request.machineId())
                 .orElseThrow(() -> new ResponseStatusException(
                         HttpStatus.NOT_FOUND, "Machine not found"));
+
+        accessService.require(accessService.canAccessMachine(machine));
 
         Maintenance maintenance = new Maintenance(
                 machine,
@@ -59,9 +69,14 @@ public class MaintenanceController {
                 .orElseThrow(() -> new ResponseStatusException(
                         HttpStatus.NOT_FOUND, "Maintenance record not found"));
 
+        accessService.require(
+                accessService.canAccessMachine(maintenance.getMachine()));
+
         Machine machine = machineRepository.findById(request.machineId())
                 .orElseThrow(() -> new ResponseStatusException(
                         HttpStatus.NOT_FOUND, "Machine not found"));
+
+        accessService.require(accessService.canAccessMachine(machine));
 
         maintenance.setMachine(machine);
         maintenance.setMaintenanceType(request.maintenanceType());
@@ -75,12 +90,14 @@ public class MaintenanceController {
     @DeleteMapping("/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void deleteMaintenance(@PathVariable Long id) {
-        if (!maintenanceRepository.existsById(id)) {
-            throw new ResponseStatusException(
-                    HttpStatus.NOT_FOUND, "Maintenance record not found");
-        }
+        Maintenance maintenance = maintenanceRepository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.NOT_FOUND, "Maintenance record not found"));
 
-        maintenanceRepository.deleteById(id);
+        accessService.require(
+                accessService.canAccessMachine(maintenance.getMachine()));
+
+        maintenanceRepository.delete(maintenance);
     }
 
     public record MaintenanceRequest(
